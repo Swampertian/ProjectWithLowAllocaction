@@ -1,0 +1,83 @@
+@page "/"
+@using DocsData.ExcelConverter
+@using DocsData.ExcelConverter.Abstractions
+@using DocsData.ExcelConverter.Models
+@inject IExcelPipeline Pipeline
+
+<PageTitle>DocsData</PageTitle>
+
+<h1>DocsData</h1>
+
+<InputFile accept=".xlsx,.xlsm,.xls" OnChange="OnFileSelected" />
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <p style="color:red">@errorMessage</p>
+}
+
+@if (upload is not null)
+{
+    <p>Arquivo: @upload.FileName</p>
+
+    <button @onclick="ProcessAsync" disabled="@isProcessing">
+        @(isProcessing ? "Processando..." : "Processar planilhas")
+    </button>
+}
+
+@if (workbookData is not null)
+{
+    <h2>Resultado</h2>
+    <ul>
+        @foreach (var sheet in workbookData.Sheets)
+        {
+            <li>@sheet.Name — @sheet.RowCount linhas x @sheet.ColumnCount colunas</li>
+        }
+    </ul>
+}
+
+@code {
+    private UploadResult? upload;
+    private WorkbookData? workbookData;
+    private string? errorMessage;
+    private bool isProcessing;
+
+    private async Task OnFileSelected(InputFileChangeEventArgs e)
+    {
+        errorMessage = null;
+        upload = null;
+        workbookData = null;
+
+        try
+        {
+            upload = await Pipeline.UploadAsync(e.File);
+        }
+        catch (ExcelConverterException ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+
+    private async Task ProcessAsync()
+    {
+        if (upload is null)
+        {
+            return;
+        }
+
+        errorMessage = null;
+        isProcessing = true;
+
+        try
+        {
+            workbookData = await Pipeline.ProcessAsync(upload.Content, upload.FileName);
+        }
+        catch (ExcelConverterException ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isProcessing = false;
+        }
+    }
+}
