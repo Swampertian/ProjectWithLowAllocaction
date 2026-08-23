@@ -1,0 +1,27 @@
+.schema-preview {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+}
+
+.schema-preview__title {
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-semibold);
+    padding: var(--space-md) var(--space-lg);
+    border-bottom: 1px solid var(--border);
+}
+
+.schema-preview__container {
+    padding: var(--space-lg);
+    background: var(--bg-base);
+    min-height: 200px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.schema-preview__container svg {
+    max-width: 100%;
+    height: auto;
+}
