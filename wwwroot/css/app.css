@@ -33,6 +33,12 @@
     text-align: center;
 }
 
+.home__hint {
+    font-size: var(--font-size-xs);
+    color: var(--text-muted);
+    margin-right: var(--space-md);
+}
+
 .home__file-info {
     display: flex;
     align-items: center;
@@ -55,6 +61,7 @@
     flex-direction: column;
     gap: var(--space-lg);
 }
+
 
 /* ── Blazor Error ── */
 #blazor-error-ui {
