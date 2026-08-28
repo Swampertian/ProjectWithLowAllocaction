@@ -5,13 +5,59 @@
     overflow: hidden;
 }
 
+.sheet-card--excluded {
+    opacity: 0.55;
+}
+
 .sheet-card__header {
     display: flex;
-    align-items: baseline;
+    align-items: center;
+    flex-wrap: wrap;
     gap: var(--space-md);
     padding: var(--space-md) var(--space-lg);
     background: var(--bg-elevated);
     border-bottom: 1px solid var(--border);
+}
+
+.sheet-card--excluded .sheet-card__header {
+    border-bottom: none;
+}
+
+.sheet-card__include {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    cursor: pointer;
+}
+
+.sheet-card__rename {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    margin-left: auto;
+}
+
+.sheet-card__rename-label {
+    font-size: var(--font-size-xs);
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.sheet-card__rename input {
+    font-size: var(--font-size-xs);
+    padding: var(--space-xs) var(--space-sm);
+}
+
+.sheet-card__table th.sheet-card__col-include,
+.sheet-card__table td.sheet-card__col-include {
+    width: 1%;
+    white-space: nowrap;
+    text-align: center;
+}
+
+.sheet-card__row--excluded {
+    opacity: 0.45;
 }
 
 .sheet-card__title {
