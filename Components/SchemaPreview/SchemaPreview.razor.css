@@ -3,6 +3,8 @@
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
     overflow: hidden;
+    display: flex;
+    flex-direction: column;
 }
 
 .schema-preview__title {
@@ -13,15 +15,13 @@
 }
 
 .schema-preview__container {
-    padding: var(--space-lg);
+    position: relative;
     background: var(--bg-base);
-    min-height: 200px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    flex: 1 1 auto;
+    min-height: 480px;
 }
 
-.schema-preview__container svg {
-    max-width: 100%;
-    height: auto;
+.schema-preview__canvas {
+    position: absolute;
+    inset: 0;
 }

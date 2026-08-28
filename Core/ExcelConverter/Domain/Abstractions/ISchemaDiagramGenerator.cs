@@ -4,5 +4,5 @@ namespace DocsData.ExcelConverter.Abstractions;
 
 public interface ISchemaDiagramGenerator
 {
-    string Generate(WorkbookData workbook);
+    SchemaGraph Generate(WorkbookData workbook);
 }

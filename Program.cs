@@ -22,7 +22,7 @@ builder.Services.AddScoped<IFileIngestor, BrowserFileIngestor>();
 builder.Services.AddScoped<IWorkbookParser, ExcelWorkbookParser>();
 builder.Services.AddScoped<IWorkbookTransformer, WorkbookTransformer>();
 builder.Services.AddScoped<IWorkbookExporter, ParquetWorkbookExporter>();
-builder.Services.AddScoped<ISchemaDiagramGenerator, MermaidSchemaDiagramGenerator>();
+builder.Services.AddScoped<ISchemaDiagramGenerator, WorkbookSchemaGraphGenerator>();
 builder.Services.AddScoped<IExcelPipeline, ExcelPipeline>();
 
 await builder.Build().RunAsync();
