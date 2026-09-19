@@ -34,7 +34,9 @@
     display: flex;
     align-items: center;
     gap: var(--space-sm);
-    margin-left: auto;
+    flex: 1 1 auto;
+    min-width: 0;
+    justify-content: flex-end;
 }
 
 .sheet-card__rename-label {
@@ -42,16 +44,19 @@
     color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: 0.05em;
+    white-space: nowrap;
 }
 
 .sheet-card__rename input {
     font-size: var(--font-size-xs);
     padding: var(--space-xs) var(--space-sm);
+    min-width: 0;
+    flex: 1 1 auto;
 }
 
 .sheet-card__table th.sheet-card__col-include,
 .sheet-card__table td.sheet-card__col-include {
-    width: 1%;
+    width: auto;
     white-space: nowrap;
     text-align: center;
 }
@@ -111,4 +116,16 @@
 .sheet-card__table select {
     font-size: var(--font-size-xs);
     padding: var(--space-xs) var(--space-sm);
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+}
+
+.sheet-card__table {
+    table-layout: fixed;
+}
+
+.sheet-card__table th:last-child,
+.sheet-card__table td:last-child {
+    width: 92px;
 }

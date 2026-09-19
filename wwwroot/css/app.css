@@ -1,28 +1,4 @@
 /* ── Home Page ── */
-.home {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-xl);
-}
-
-.home__header {
-    text-align: center;
-    padding: var(--space-xl) 0 0;
-}
-
-.home__header h1 {
-    font-size: var(--font-size-2xl);
-    font-weight: var(--font-weight-bold);
-    color: var(--text-white);
-    letter-spacing: -0.03em;
-}
-
-.home__subtitle {
-    font-size: var(--font-size-base);
-    color: var(--text-secondary);
-    margin-top: var(--space-sm);
-}
-
 .home__error {
     background: rgba(239, 83, 80, 0.1);
     border: 1px solid rgba(239, 83, 80, 0.3);
@@ -54,12 +30,6 @@
     font-size: var(--font-size-sm);
     color: var(--text-secondary);
     font-family: 'SF Mono', 'Fira Code', monospace;
-}
-
-.home__results {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-lg);
 }
 
 
