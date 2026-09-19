@@ -163,9 +163,6 @@ public partial class Home
         hasAppliedTransform = false;
         Diagram.Nodes.Clear();
     }
-
-    // Only steps already completed (index < currentStep) are clickable in the stepper,
-    // so this only ever moves backward -- never skips ahead past unfinished work.
     private void GoToStep(int targetStep)
     {
         if (targetStep >= currentStep) return;
@@ -189,9 +186,6 @@ public partial class Home
         }
     }
 
-    // Sheet nodes wrap the same SheetEditState instances edited by SheetCard, so include/rename/
-    // retype changes re-render through Blazor's normal component tree -- no separate preview
-    // refresh step needed. Nodes are only rebuilt when the sheet set itself changes.
     private void RebuildDiagramNodes()
     {
         Diagram.Nodes.Clear();
