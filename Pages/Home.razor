@@ -2,54 +2,144 @@
 @using DocsData.ExcelConverter
 @using DocsData.ExcelConverter.Abstractions
 @using DocsData.ExcelConverter.Models
+@using DocsData.Components
 @inject IExcelPipeline Pipeline
+@inject ISchemaDiagramGenerator DiagramGenerator
+@inject IJSRuntime JS
 
 <PageTitle>DocsData</PageTitle>
 
-<h1>DocsData</h1>
+<div class="home">
+    <div class="home__header">
+        <p class="home__subtitle">Converta arquivos em dados estruturados</p>
+    </div>
 
-<InputFile accept=".xlsx,.xlsm,.xls" OnChange="OnFileSelected" />
+    <PipelineStepper CurrentStep="@currentStep" />
 
-@if (!string.IsNullOrEmpty(errorMessage))
-{
-    <p style="color:red">@errorMessage</p>
-}
+    @if (workbookData is null)
+    {
+        <DropZone Label="Arraste o arquivo Excel aqui"
+                  Hint="ou clique para selecionar (.xlsx, .xlsm, .xls)"
+                  OnFile="OnFileSelected" />
+    }
 
-@if (upload is not null)
-{
-    <p>Arquivo: @upload.FileName</p>
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="home__error">@errorMessage</div>
+    }
 
-    <button @onclick="ProcessAsync" disabled="@isProcessing">
-        @(isProcessing ? "Processando..." : "Processar planilhas")
-    </button>
-}
+    @if (upload is not null && workbookData is null)
+    {
+        <div class="home__file-info">
+            <span class="home__file-name">@upload.FileName</span>
+            <button class="btn btn-primary" @onclick="ProcessAsync" disabled="@isProcessing">
+                @(isProcessing ? "Processando..." : "Processar planilhas")
+            </button>
+        </div>
+    }
 
-@if (workbookData is not null)
-{
-    <h2>Resultado</h2>
-    <ul>
-        @foreach (var sheet in workbookData.Sheets)
-        {
-            <li>@sheet.Name — @sheet.RowCount linhas x @sheet.ColumnCount colunas</li>
-        }
-    </ul>
-}
+    @if (workbookData is not null)
+    {
+        <div class="home__results">
+            <button class="btn btn-outline" @onclick="ResetAsync">
+                Novo arquivo
+            </button>
+
+            @foreach (var sheet in sheetEdits)
+            {
+                var edit = sheet;
+                <SheetCard SheetName="@edit.SheetName"
+                           RowCount="@edit.RowCount"
+                           ColumnCount="@edit.ColumnCount"
+                           Columns="@edit.Columns"
+                           Included="@edit.Included"
+                           IncludedChanged="@(value => OnSheetIncludedChanged(edit, value))"
+                           TargetName="@edit.TargetName"
+                           TargetNameChanged="@(value => OnSheetTargetNameChanged(edit, value))"
+                           OnColumnChanged="OnColumnChanged" />
+            }
+
+            <SchemaPreview ElementId="@SchemaDiagramElementId" />
+
+            <ActionBar>
+                <LeftContent>
+                    <button class="btn btn-outline" @onclick="ApplyTransformAsync" disabled="@isTransforming">
+                        @(isTransforming ? "Aplicando..." : "Aplicar alteracoes")
+                    </button>
+                </LeftContent>
+                <RightContent>
+                    @if (hasPendingSelection)
+                    {
+                        <span class="home__hint">Aplique as alteracoes para exportar</span>
+                    }
+                    <button class="btn btn-primary"
+                            @onclick="ExportAsync"
+                            disabled="@(isExporting || hasPendingSelection)">
+                        @(isExporting ? "Exportando..." : "Exportar Parquet")
+                    </button>
+                </RightContent>
+            </ActionBar>
+        </div>
+    }
+</div>
 
 @code {
+    private const string SchemaDiagramElementId = "schema-diagram";
+
+    private static readonly IReadOnlyDictionary<string, Type> ColumnTypesByName = new Dictionary<string, Type>
+    {
+        ["string"] = typeof(string),
+        ["double"] = typeof(double),
+        ["datetime"] = typeof(DateTime),
+        ["bool"] = typeof(bool)
+    };
+
     private UploadResult? upload;
     private WorkbookData? workbookData;
+    private List<SheetEditState> sheetEdits = [];
     private string? errorMessage;
     private bool isProcessing;
+    private bool isExporting;
+    private bool isTransforming;
+    private bool hasAppliedTransform;
+    private bool schemaPreviewPending;
 
-    private async Task OnFileSelected(InputFileChangeEventArgs e)
+    private int currentStep => workbookData is null
+        ? (upload is null ? 0 : 1)
+        : (hasAppliedTransform ? 3 : 2);
+
+    // BuildSheetEdits mirrors the current workbook, so any deviation from it is an edit the user
+    // hasn't applied yet. Export stays open while the edits still match the data it would write.
+    private bool hasPendingSelection => sheetEdits.Any(sheet =>
+        !sheet.Included
+        || !string.Equals(sheet.TargetName, sheet.SheetName, StringComparison.Ordinal)
+        || sheet.Columns.Any(column =>
+            !column.Include
+            || !string.Equals(column.Name, column.OriginalName, StringComparison.Ordinal)
+            || !string.Equals(column.TypeName, column.OriginalTypeName, StringComparison.Ordinal)));
+
+    private sealed class SheetEditState
+    {
+        public required string SheetName { get; init; }
+        public required int RowCount { get; init; }
+        public required int ColumnCount { get; init; }
+        public required List<SheetCard.ColumnState> Columns { get; init; }
+        public bool Included { get; set; } = true;
+        public required string TargetName { get; set; }
+    }
+
+    private async Task OnFileSelected(IBrowserFile file)
     {
         errorMessage = null;
         upload = null;
         workbookData = null;
+        sheetEdits = [];
+        hasAppliedTransform = false;
+        await DisposeSchemaPreviewAsync();
 
         try
         {
-            upload = await Pipeline.UploadAsync(e.File);
+            upload = await Pipeline.UploadAsync(file);
         }
         catch (ExcelConverterException ex)
         {
@@ -59,17 +149,17 @@
 
     private async Task ProcessAsync()
     {
-        if (upload is null)
-        {
-            return;
-        }
+        if (upload is null) return;
 
         errorMessage = null;
         isProcessing = true;
+        hasAppliedTransform = false;
 
         try
         {
             workbookData = await Pipeline.ProcessAsync(upload.Content, upload.FileName);
+            sheetEdits = BuildSheetEdits(workbookData);
+            schemaPreviewPending = true;
         }
         catch (ExcelConverterException ex)
         {
@@ -78,6 +168,239 @@
         finally
         {
             isProcessing = false;
+        }
+    }
+
+    private async Task ApplyTransformAsync()
+    {
+        if (workbookData is null) return;
+
+        errorMessage = null;
+
+        var validationError = ValidateSelection();
+        if (validationError is not null)
+        {
+            errorMessage = validationError;
+            return;
+        }
+
+        isTransforming = true;
+
+        try
+        {
+            var request = BuildTransformRequest();
+            workbookData = await Pipeline.TransformAsync(workbookData, request);
+            sheetEdits = BuildSheetEdits(workbookData);
+            hasAppliedTransform = true;
+            await RefreshSchemaPreviewAsync();
+        }
+        catch (ExcelConverterException ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isTransforming = false;
+        }
+    }
+
+    private async Task ExportAsync()
+    {
+        if (workbookData is null) return;
+
+        if (hasPendingSelection)
+        {
+            errorMessage = "Aplique as alteracoes antes de exportar.";
+            return;
+        }
+
+        errorMessage = null;
+        isExporting = true;
+
+        try
+        {
+            var zipBytes = await Pipeline.ExportAsync(workbookData);
+            var fileName = $"{Path.GetFileNameWithoutExtension(workbookData.FileName)}.zip";
+            await JS.InvokeVoidAsync("downloadFileFromBase64", fileName, Convert.ToBase64String(zipBytes));
+        }
+        catch (ExcelConverterException ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isExporting = false;
+        }
+    }
+
+    private async Task OnColumnChanged(SheetCard.ColumnState column)
+    {
+        await RefreshSchemaPreviewAsync();
+        StateHasChanged();
+    }
+
+    private async Task OnSheetIncludedChanged(SheetEditState sheet, bool included)
+    {
+        sheet.Included = included;
+        await RefreshSchemaPreviewAsync();
+        StateHasChanged();
+    }
+
+    private async Task OnSheetTargetNameChanged(SheetEditState sheet, string targetName)
+    {
+        sheet.TargetName = targetName;
+        await RefreshSchemaPreviewAsync();
+        StateHasChanged();
+    }
+
+    private async Task ResetAsync()
+    {
+        upload = null;
+        workbookData = null;
+        sheetEdits = [];
+        errorMessage = null;
+        hasAppliedTransform = false;
+        await DisposeSchemaPreviewAsync();
+    }
+
+    // Live schema preview: rebuilt from sheetEdits (UI state) on every edit, independent of
+    // WorkbookTransformer, so the diagram reflects include/rename/type choices before Apply.
+    private SchemaGraph BuildLiveSchemaGraph() => new(sheetEdits
+        .Where(sheet => sheet.Included)
+        .Select(sheet => new SchemaTable(
+            string.IsNullOrWhiteSpace(sheet.TargetName) ? sheet.SheetName : sheet.TargetName,
+            sheet.Columns
+                .Where(column => column.Include)
+                .Select(column => new SchemaColumn(column.Name, column.TypeName))
+                .ToList()))
+        .ToList());
+
+    private async Task RefreshSchemaPreviewAsync()
+    {
+        var graph = BuildLiveSchemaGraph();
+        try
+        {
+            await JS.InvokeVoidAsync("renderSchemaGraph", SchemaDiagramElementId, ToJsGraph(graph));
+        }
+        catch (JSException)
+        {
+            errorMessage = "Não foi possível atualizar a preview do schema.";
+        }
+    }
+
+    private async Task DisposeSchemaPreviewAsync()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("disposeSchemaGraph", SchemaDiagramElementId);
+        }
+        catch (JSException)
+        {
+        }
+    }
+
+    private static object ToJsGraph(SchemaGraph graph) => new
+    {
+        tables = graph.Tables.Select(table => new
+        {
+            name = table.Name,
+            columns = table.Columns.Select(column => new { name = column.Name, type = column.TypeName })
+        })
+    };
+
+    private List<SheetEditState> BuildSheetEdits(WorkbookData workbook) =>
+        workbook.Sheets.Select(sheet => new SheetEditState
+        {
+            SheetName = sheet.Name,
+            TargetName = sheet.Name,
+            RowCount = sheet.RowCount,
+            ColumnCount = sheet.ColumnNames.Count,
+            Columns = sheet.ColumnNames.Select((name, i) =>
+            {
+                var typeName = ColumnTypesByName.FirstOrDefault(kv => kv.Value == sheet.ColumnTypes[i]).Key ?? "string";
+                return new SheetCard.ColumnState
+                {
+                    OriginalName = name,
+                    OriginalTypeName = typeName,
+                    Name = name,
+                    TypeName = typeName
+                };
+            }).ToList()
+        }).ToList();
+
+    private WorkbookTransformRequest BuildTransformRequest()
+    {
+        // Only the selected sheets are sent: a sheet absent from the request is dropped by the
+        // Transform stage. Columns stay index-aligned to the source, so an unselected column is
+        // sent with Include=false instead of being left out of the list.
+        var sheets = sheetEdits
+            .Where(sheet => sheet.Included)
+            .Select(sheet => new SheetTransformRequest(
+                sheet.SheetName,
+                sheet.Columns
+                    .Select(c => new ColumnTransform(
+                        c.Name,
+                        ColumnTypesByName.GetValueOrDefault(c.TypeName, typeof(string)),
+                        c.Include))
+                    .ToList(),
+                sheet.TargetName))
+            .ToList();
+
+        return new WorkbookTransformRequest(sheets);
+    }
+
+    private string? ValidateSelection()
+    {
+        var selected = sheetEdits.Where(sheet => sheet.Included).ToList();
+        if (selected.Count == 0)
+        {
+            return "Selecione ao menos uma planilha para continuar.";
+        }
+
+        var withoutColumns = selected.FirstOrDefault(sheet => !sheet.Columns.Any(c => c.Include));
+        if (withoutColumns is not null)
+        {
+            return $"A planilha '{withoutColumns.SheetName}' precisa de ao menos uma coluna selecionada.";
+        }
+
+        var blankName = selected.FirstOrDefault(sheet => string.IsNullOrWhiteSpace(sheet.TargetName));
+        if (blankName is not null)
+        {
+            return $"Informe um nome de tabela para a planilha '{blankName.SheetName}'.";
+        }
+
+        var duplicateSheet = FindSheetWithDuplicateColumnNames(selected);
+        if (duplicateSheet is not null)
+        {
+            return $"A planilha '{duplicateSheet}' tem colunas com nomes repetidos. Corrija antes de aplicar.";
+        }
+
+        return null;
+    }
+
+    private static string? FindSheetWithDuplicateColumnNames(IEnumerable<SheetEditState> sheets) =>
+        sheets
+            .FirstOrDefault(sheet => sheet.Columns
+                .Where(c => c.Include)
+                .Select(c => c.Name)
+                .GroupBy(name => name, StringComparer.OrdinalIgnoreCase)
+                .Any(group => group.Count() > 1))
+            ?.SheetName;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!schemaPreviewPending || workbookData is null) return;
+
+        schemaPreviewPending = false;
+
+        try
+        {
+            await JS.InvokeVoidAsync("renderSchemaGraph", SchemaDiagramElementId, ToJsGraph(DiagramGenerator.Generate(workbookData)));
+        }
+        catch (JSException)
+        {
+            errorMessage = "Não foi possível gerar a preview do schema.";
+            StateHasChanged();
         }
     }
 }
