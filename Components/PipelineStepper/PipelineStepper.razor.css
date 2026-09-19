@@ -12,6 +12,25 @@
     gap: var(--space-sm);
 }
 
+.stepper__hit {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    font: inherit;
+}
+
+.stepper__hit:hover .stepper__dot {
+    box-shadow: 0 0 0 3px var(--accent-muted);
+}
+
+.stepper__hit:hover .stepper__label {
+    color: var(--text-primary);
+}
+
 .stepper__dot {
     width: 10px;
     height: 10px;

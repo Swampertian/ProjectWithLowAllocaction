@@ -5,8 +5,18 @@
         var isCompleted = step.Index < CurrentStep;
 
         <div class="stepper__item @(isActive ? "stepper__item--active" : "") @(isCompleted ? "stepper__item--completed" : "")">
-            <div class="stepper__dot"></div>
-            <div class="stepper__label">@step.Label</div>
+            @if (isCompleted)
+            {
+                <button type="button" class="stepper__hit" @onclick="() => OnStepClick.InvokeAsync(step.Index)" title="Voltar para @step.Label">
+                    <div class="stepper__dot"></div>
+                    <div class="stepper__label">@step.Label</div>
+                </button>
+            }
+            else
+            {
+                <div class="stepper__dot"></div>
+                <div class="stepper__label">@step.Label</div>
+            }
         </div>
 
         @if (step.Index < Steps.Length - 1)
@@ -18,6 +28,7 @@
 
 @code {
     [Parameter] public int CurrentStep { get; set; }
+    [Parameter] public EventCallback<int> OnStepClick { get; set; }
 
     private StepItem[] Steps { get; } =
     [
